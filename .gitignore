@@ -1,0 +1,15 @@
+# Node modules
+node_modules/
+
+# Data and debug directories
+data/
+debug/
+
+# Logs
+*.log
+
+# OS generated files
+.DS_Store
+
+# Editor directories and files
+# .vscode/

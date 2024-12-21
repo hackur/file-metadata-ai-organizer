@@ -10,6 +10,7 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "ignore": "^6.0.2",
     "mime-types": "^2.1.35"
   }
 }
