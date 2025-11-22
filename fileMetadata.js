@@ -1,12 +1,34 @@
+/*
+ * fileMetadata.js
+ *
+ * Description:
+ *   This module analyzes a directory's contents and generates a markdown report
+ *   detailing file metadata such as size, creation and modification dates, and MIME type.
+ *   It respects .gitignore rules by aggregating global, core, and local gitignore patterns.
+ *
+ * Bullet Train Rails Boilerplate:
+ *   Inspired by the modular and well-documented pattern in Bullet Train Rails projects,
+ *   this module employs clear JSDoc comments to promote maintainability.
+ *
+ * Dependencies:
+ *   fs (Promise API), path, ignore, os, child_process, mime-types, readline
+ */
+
 const fs = require('fs').promises;
 const path = require('path');
-const mime = require('mime-types');
 const { createReadStream } = require('fs');
 const readline = require('readline');
 const ignore = require('ignore');
 const os = require('os');
 const { execSync } = require('child_process');
+const mime = require('mime-types');
 
+/**
+ * Asynchronously reads the content of a file if it exists.
+ *
+ * @param {string} filepath - The path to the file.
+ * @returns {Promise<string>} The file contents, or an empty string if the file does not exist.
+ */
 async function readFileIfExists(filepath) {
     try {
         return await fs.readFile(filepath, 'utf8');
@@ -15,23 +37,33 @@ async function readFileIfExists(filepath) {
     }
 }
 
+/**
+ * Retrieves gitignore patterns from global and git core configurations.
+ *
+ * Aggregates patterns from:
+ *   - Global .gitignore located in the user's home directory.
+ *   - Git core excludes file, if configured.
+ *   - Default patterns commonly ignored in git repositories.
+ *
+ * @returns {Promise<Object>} An instance of 'ignore' with added patterns.
+ */
 async function getGitIgnorePatterns() {
     const ig = ignore();
 
-    // Get global gitignore
+    // Retrieve global .gitignore patterns
     const globalGitignorePath = path.join(os.homedir(), '.gitignore');
     const globalPatterns = await readFileIfExists(globalGitignorePath);
 
-    // Get git core excludes
+    // Retrieve git core excludes file from configuration
     let coreExcludesPath = '';
     try {
         coreExcludesPath = execSync('git config --get core.excludesfile', { encoding: 'utf8' }).trim();
     } catch (error) {
-        // Git not installed or no core.excludesfile configured
+        // Git might not be installed or core excludes might not be configured.
     }
     const coreExcludePatterns = coreExcludesPath ? await readFileIfExists(coreExcludesPath) : '';
 
-    // Default patterns that git uses
+    // Default ignore patterns (common in git repos)
     const defaultPatterns = [
         '.git/',
         '.DS_Store',
@@ -39,7 +71,6 @@ async function getGitIgnorePatterns() {
         '*~'
     ].join('\n');
 
-    // Combine all patterns
     ig.add(defaultPatterns);
     if (globalPatterns) ig.add(globalPatterns);
     if (coreExcludePatterns) ig.add(coreExcludePatterns);
