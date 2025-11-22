@@ -1,0 +1,203 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Directory Tree</title>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            padding: 20px;
+            background: #1e1e1e;
+            color: #d4d4d4;
+        }
+        .tree { list-style: none; padding-left: 0; }
+        .tree ul { list-style: none; padding-left: 20px; }
+        .tree li { margin: 3px 0; }
+        .tree .dir { color: #569cd6; cursor: pointer; }
+        .tree .file { color: #9cdcfe; }
+        .tree .size { color: #6a9955; margin-left: 10px; }
+        .tree .toggle {
+            display: inline-block;
+            width: 16px;
+            text-align: center;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <h1>Directory Tree</h1>
+    <ul class="tree"><li>
+                <span class="toggle">▼</span>
+                <span class="dir">📁 .claude/</span>
+                <ul><li>
+                <span style="display: inline-block; width: 16px;"></span>
+                <span class="file">💻 settings.local.json</span>
+                <span class="size">(159.0 B)</span>
+            </li></ul>
+            </li><li>
+                <span class="toggle">▼</span>
+                <span class="dir">📁 .vscode/</span>
+                <ul><li>
+                <span style="display: inline-block; width: 16px;"></span>
+                <span class="file">💻 settings.json</span>
+                <span class="size">(2.0 KB)</span>
+            </li></ul>
+            </li><li>
+                <span class="toggle">▼</span>
+                <span class="dir">📁 src/</span>
+                <ul><li>
+                <span class="toggle">▼</span>
+                <span class="dir">📁 formatters/</span>
+                <ul><li>
+                <span style="display: inline-block; width: 16px;"></span>
+                <span class="file">💻 LLMFormatter.js</span>
+                <span class="size">(10.2 KB)</span>
+            </li></ul>
+            </li><li>
+                <span class="toggle">▼</span>
+                <span class="dir">📁 processors/</span>
+                <ul><li>
+                <span style="display: inline-block; width: 16px;"></span>
+                <span class="file">💻 ArchiveProcessor.js</span>
+                <span class="size">(5.4 KB)</span>
+            </li><li>
+                <span style="display: inline-block; width: 16px;"></span>
+                <span class="file">💻 AudioProcessor.js</span>
+                <span class="size">(4.5 KB)</span>
+            </li><li>
+                <span style="display: inline-block; width: 16px;"></span>
+                <span class="file">💻 BaseProcessor.js</span>
+                <span class="size">(3.0 KB)</span>
+            </li><li>
+                <span style="display: inline-block; width: 16px;"></span>
+                <span class="file">💻 CodeProcessor.js</span>
+                <span class="size">(8.4 KB)</span>
+            </li><li>
+                <span style="display: inline-block; width: 16px;"></span>
+                <span class="file">💻 ImageProcessor.js</span>
+                <span class="size">(8.3 KB)</span>
+            </li><li>
+                <span style="display: inline-block; width: 16px;"></span>
+                <span class="file">💻 MarkdownProcessor.js</span>
+                <span class="size">(5.7 KB)</span>
+            </li><li>
+                <span style="display: inline-block; width: 16px;"></span>
+                <span class="file">💻 PDFProcessor.js</span>
+                <span class="size">(3.6 KB)</span>
+            </li><li>
+                <span style="display: inline-block; width: 16px;"></span>
+                <span class="file">💻 VideoProcessor.js</span>
+                <span class="size">(5.4 KB)</span>
+            </li></ul>
+            </li><li>
+                <span class="toggle">▼</span>
+                <span class="dir">📁 storage/</span>
+                <ul><li>
+                <span style="display: inline-block; width: 16px;"></span>
+                <span class="file">💻 database.js</span>
+                <span class="size">(21.5 KB)</span>
+            </li><li>
+                <span style="display: inline-block; width: 16px;"></span>
+                <span class="file">💻 queryAPI.js</span>
+                <span class="size">(8.0 KB)</span>
+            </li><li>
+                <span style="display: inline-block; width: 16px;"></span>
+                <span class="file">💻 schema.js</span>
+                <span class="size">(7.6 KB)</span>
+            </li></ul>
+            </li><li>
+                <span class="toggle">▼</span>
+                <span class="dir">📁 utils/</span>
+                <ul><li>
+                <span style="display: inline-block; width: 16px;"></span>
+                <span class="file">💻 config.js</span>
+                <span class="size">(5.6 KB)</span>
+            </li><li>
+                <span style="display: inline-block; width: 16px;"></span>
+                <span class="file">💻 hash.js</span>
+                <span class="size">(3.3 KB)</span>
+            </li><li>
+                <span style="display: inline-block; width: 16px;"></span>
+                <span class="file">💻 logger.js</span>
+                <span class="size">(4.2 KB)</span>
+            </li><li>
+                <span style="display: inline-block; width: 16px;"></span>
+                <span class="file">💻 progress.js</span>
+                <span class="size">(2.5 KB)</span>
+            </li><li>
+                <span style="display: inline-block; width: 16px;"></span>
+                <span class="file">💻 scanner.js</span>
+                <span class="size">(7.2 KB)</span>
+            </li></ul>
+            </li><li>
+                <span class="toggle">▼</span>
+                <span class="dir">📁 visualizers/</span>
+                <ul><li>
+                <span style="display: inline-block; width: 16px;"></span>
+                <span class="file">💻 TreeVisualizer.js</span>
+                <span class="size">(8.0 KB)</span>
+            </li></ul>
+            </li><li>
+                <span style="display: inline-block; width: 16px;"></span>
+                <span class="file">💻 MetadataAnalyzer.js</span>
+                <span class="size">(6.3 KB)</span>
+            </li></ul>
+            </li><li>
+                <span style="display: inline-block; width: 16px;"></span>
+                <span class="file">📄 .gitignore</span>
+                <span class="size">(160.0 B)</span>
+            </li><li>
+                <span style="display: inline-block; width: 16px;"></span>
+                <span class="file">💻 cli.js</span>
+                <span class="size">(11.3 KB)</span>
+            </li><li>
+                <span style="display: inline-block; width: 16px;"></span>
+                <span class="file">💻 config.default.json</span>
+                <span class="size">(1.8 KB)</span>
+            </li><li>
+                <span style="display: inline-block; width: 16px;"></span>
+                <span class="file">📄 DEVELOPMENT_PLAN.md</span>
+                <span class="size">(18.1 KB)</span>
+            </li><li>
+                <span style="display: inline-block; width: 16px;"></span>
+                <span class="file">💻 fileMetadata.js</span>
+                <span class="size">(6.3 KB)</span>
+            </li><li>
+                <span style="display: inline-block; width: 16px;"></span>
+                <span class="file">📄 IMPLEMENTATION_SUMMARY.md</span>
+                <span class="size">(8.1 KB)</span>
+            </li><li>
+                <span style="display: inline-block; width: 16px;"></span>
+                <span class="file">💻 package-lock.json</span>
+                <span class="size">(187.5 KB)</span>
+            </li><li>
+                <span style="display: inline-block; width: 16px;"></span>
+                <span class="file">💻 package.json</span>
+                <span class="size">(1.0 KB)</span>
+            </li><li>
+                <span style="display: inline-block; width: 16px;"></span>
+                <span class="file">📄 QUICK_START.md</span>
+                <span class="size">(5.0 KB)</span>
+            </li><li>
+                <span style="display: inline-block; width: 16px;"></span>
+                <span class="file">📄 README.md</span>
+                <span class="size">(10.9 KB)</span>
+            </li><li>
+                <span style="display: inline-block; width: 16px;"></span>
+                <span class="file">📄 USAGE_EXAMPLES.md</span>
+                <span class="size">(8.7 KB)</span>
+            </li></ul>
+    <script>
+        document.querySelectorAll('.toggle').forEach(toggle => {
+            toggle.addEventListener('click', (e) => {
+                const ul = e.target.parentElement.querySelector('ul');
+                if (ul) {
+                    ul.style.display = ul.style.display === 'none' ? 'block' : 'none';
+                    e.target.textContent = ul.style.display === 'none' ? '▶' : '▼';
+                }
+            });
+        });
+    </script>
+</body>
+</html>
