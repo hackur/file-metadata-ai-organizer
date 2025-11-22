@@ -1,0 +1,83 @@
+{
+  "scanning": {
+    "maxDepth": -1,
+    "followSymlinks": false,
+    "respectGitignore": true,
+    "maxFileSize": 104857600,
+    "parallelProcessing": true,
+    "maxConcurrency": 4
+  },
+  "storage": {
+    "type": "sqlite",
+    "dbPath": "./data/metadata.db",
+    "jsonPath": "./data/metadata.json",
+    "incrementalScanning": true,
+    "cacheEnabled": true,
+    "cacheTTL": 3600
+  },
+  "extractors": {
+    "images": {
+      "enabled": true,
+      "extractExif": true,
+      "extractColors": true,
+      "generateThumbnails": true,
+      "thumbnailSizes": [150, 300],
+      "perceptualHash": true
+    },
+    "videos": {
+      "enabled": true,
+      "extractKeyframes": true,
+      "keyframeInterval": 10,
+      "ffprobePath": "ffprobe"
+    },
+    "audio": {
+      "enabled": true,
+      "extractWaveform": false,
+      "extractEmbeddedArt": true
+    },
+    "documents": {
+      "enabled": true,
+      "extractText": true,
+      "maxTextLength": 10000,
+      "ocrImages": false
+    },
+    "code": {
+      "enabled": true,
+      "calculateComplexity": true,
+      "extractImports": true,
+      "detectLanguage": true
+    },
+    "archives": {
+      "enabled": true,
+      "listContents": true,
+      "maxFilesToList": 1000,
+      "skipExtraction": true
+    }
+  },
+  "output": {
+    "formats": ["json", "markdown"],
+    "includeTimestamps": true,
+    "prettyPrint": true,
+    "llmOptimized": true
+  },
+  "llm": {
+    "contextWindow": 32000,
+    "tokenCountingModel": "gpt-4",
+    "includeSummaries": true,
+    "prioritizeRecent": true,
+    "maxFilesInContext": 100
+  },
+  "logging": {
+    "level": "info",
+    "outputFile": "./logs/app.log",
+    "enableConsole": true,
+    "maxFileSize": 10485760,
+    "maxFiles": 5
+  },
+  "visualization": {
+    "enableCharts": true,
+    "chartFormat": "html",
+    "enableTreeView": true,
+    "enableDependencyGraph": true
+  }
+}
