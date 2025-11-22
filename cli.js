@@ -318,10 +318,10 @@ function printTable(results) {
     console.log('-'.repeat(95));
 
     for (const file of results.slice(0, 50)) {
-        const path = file.relativePath.padEnd(50).substring(0, 50);
-        const category = file.category.padEnd(15);
-        const size = formatSize(file.size).padEnd(15);
-        const modified = new Date(file.modified).toLocaleDateString();
+        const path = (file.relativePath || file.path || 'Unknown').padEnd(50).substring(0, 50);
+        const category = (file.category || 'unknown').padEnd(15);
+        const size = formatSize(file.size || 0).padEnd(15);
+        const modified = new Date(file.modified || Date.now()).toLocaleDateString();
 
         console.log(path + category + size + modified);
     }

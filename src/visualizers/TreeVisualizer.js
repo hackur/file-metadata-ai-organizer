@@ -71,7 +71,8 @@ class TreeVisualizer {
         };
 
         for (const file of files) {
-            const parts = file.relativePath.split('/');
+            if (!file.relativePath && !file.path) continue;
+            const parts = (file.relativePath || file.path).split('/');
             let current = root;
 
             for (let i = 0; i < parts.length; i++) {

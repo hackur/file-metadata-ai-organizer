@@ -4,10 +4,21 @@
  */
 
 const BaseProcessor = require('./BaseProcessor');
-const musicMetadata = require('music-metadata');
 const fs = require('fs');
 
 class AudioProcessor extends BaseProcessor {
+    constructor(config = {}) {
+        super(config);
+        this.musicMetadata = null;
+    }
+
+    async ensureMusicMetadata() {
+        if (!this.musicMetadata) {
+            this.musicMetadata = await import('music-metadata');
+        }
+        return this.musicMetadata;
+    }
+
     canProcess(fileInfo) {
         return fileInfo.category === 'audio';
     }
@@ -48,7 +59,8 @@ class AudioProcessor extends BaseProcessor {
      */
     async extractAudioMetadata(fileInfo) {
         try {
-            const metadata = await musicMetadata.parseFile(fileInfo.path);
+            const mm = await this.ensureMusicMetadata();
+            const metadata = await mm.parseFile(fileInfo.path);
 
             // Extract format information
             if (metadata.format) {
