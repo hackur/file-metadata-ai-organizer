@@ -497,7 +497,136 @@ class DatabaseManager {
         }
 
         const stmt = this.db.prepare(query);
-        return stmt.all(...params);
+        const results = stmt.all(...params);
+
+        // Transform snake_case to camelCase
+        return results.map(row => this.transformSQLRow(row));
+    }
+
+    /**
+     * Transform SQL row from snake_case to camelCase
+     */
+    transformSQLRow(row) {
+        const file = {
+            id: row.id,
+            path: row.path,
+            relativePath: row.relative_path,
+            name: row.name,
+            extension: row.extension,
+            size: row.size,
+            created: row.created,
+            modified: row.modified,
+            accessed: row.accessed,
+            mimeType: row.mime_type,
+            category: row.category,
+            hash: {
+                md5: row.md5_hash,
+                sha256: row.sha256_hash
+            },
+            processing: {
+                processedAt: row.processed_at,
+                processingTime: row.processing_time,
+                version: row.version
+            }
+        };
+
+        // Fetch related metadata
+        file.metadata = this.getFileMetadata(row.id, row.category);
+
+        return file;
+    }
+
+    /**
+     * Get metadata for a file based on category
+     */
+    getFileMetadata(fileId, category) {
+        const metadata = {};
+
+        if (category === 'code') {
+            const stmt = this.db.prepare('SELECT * FROM code_metadata WHERE file_id = ?');
+            const codeData = stmt.get(fileId);
+            if (codeData) {
+                metadata.code = {
+                    language: codeData.language,
+                    linesTotal: codeData.lines_total,
+                    linesCode: codeData.lines_code,
+                    linesComment: codeData.lines_comment,
+                    linesBlank: codeData.lines_blank,
+                    complexity: codeData.complexity
+                };
+            }
+        } else if (category === 'image') {
+            const stmt = this.db.prepare('SELECT * FROM image_metadata WHERE file_id = ?');
+            const imgData = stmt.get(fileId);
+            if (imgData) {
+                metadata.image = {
+                    width: imgData.width,
+                    height: imgData.height,
+                    aspectRatio: imgData.aspect_ratio,
+                    colorSpace: imgData.color_space,
+                    bitDepth: imgData.bit_depth,
+                    hasAlpha: imgData.has_alpha === 1,
+                    perceptualHash: imgData.perceptual_hash
+                };
+            }
+        } else if (category === 'video') {
+            const stmt = this.db.prepare('SELECT * FROM video_metadata WHERE file_id = ?');
+            const vidData = stmt.get(fileId);
+            if (vidData) {
+                metadata.video = {
+                    duration: vidData.duration,
+                    width: vidData.width,
+                    height: vidData.height,
+                    frameRate: vidData.frame_rate,
+                    bitrate: vidData.bitrate,
+                    codec: vidData.codec,
+                    format: vidData.format
+                };
+            }
+        } else if (category === 'audio') {
+            const stmt = this.db.prepare('SELECT * FROM audio_metadata WHERE file_id = ?');
+            const audData = stmt.get(fileId);
+            if (audData) {
+                metadata.audio = {
+                    duration: audData.duration,
+                    bitrate: audData.bitrate,
+                    sampleRate: audData.sample_rate,
+                    channels: audData.channels,
+                    codec: audData.codec,
+                    tags: audData.tags ? JSON.parse(audData.tags) : null
+                };
+            }
+        } else if (category === 'document') {
+            const stmt = this.db.prepare('SELECT * FROM document_metadata WHERE file_id = ?');
+            const docData = stmt.get(fileId);
+            if (docData) {
+                metadata.document = {
+                    pageCount: docData.page_count,
+                    wordCount: docData.word_count,
+                    charCount: docData.char_count,
+                    author: docData.author,
+                    title: docData.title,
+                    subject: docData.subject,
+                    language: docData.language,
+                    format: docData.format
+                };
+            }
+        } else if (category === 'archive') {
+            const stmt = this.db.prepare('SELECT * FROM archive_metadata WHERE file_id = ?');
+            const archData = stmt.get(fileId);
+            if (archData) {
+                metadata.archive = {
+                    format: archData.format,
+                    compressed: archData.compressed === 1,
+                    uncompressedSize: archData.uncompressed_size,
+                    compressionRatio: archData.compression_ratio,
+                    fileCount: archData.file_count,
+                    encrypted: archData.encrypted === 1
+                };
+            }
+        }
+
+        return Object.keys(metadata).length > 0 ? metadata : null;
     }
 
     /**
