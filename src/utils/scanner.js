@@ -1,12 +1,14 @@
 /**
  * File Scanner with Incremental Support
  * Scans directories and detects file changes for incremental processing
+ * Includes magic number detection via file-type package
  */
 
 const fs = require('fs').promises;
 const path = require('path');
 const { createReadStream } = require('fs');
 const mime = require('mime-types');
+const FileType = require('file-type');
 const hashUtil = require('./hash');
 const logger = require('./logger');
 
@@ -20,6 +22,49 @@ class FileScanner {
             modifiedFiles: 0,
             unchangedFiles: 0,
             errors: 0
+        };
+    }
+
+    /**
+     * Detect MIME type from file content using magic numbers
+     * Falls back to extension-based detection if file-type cannot determine type
+     *
+     * @param {string} filePath - Path to the file
+     * @returns {Promise<Object>} Object with mimeDetection details
+     * @returns {string} mimeDetection.fromExtension - MIME type from file extension
+     * @returns {string|null} mimeDetection.fromMagicNumber - MIME type from magic number detection
+     * @returns {boolean} mimeDetection.confident - True if magic number detection succeeded
+     * @example
+     * const result = await scanner.detectMimeType('/path/to/file');
+     * // { fromExtension: 'application/pdf', fromMagicNumber: 'application/pdf', confident: true }
+     */
+    async detectMimeType(filePath) {
+        const fromExtension = mime.lookup(filePath) || 'application/octet-stream';
+        let fromMagicNumber = null;
+        let confident = false;
+
+        try {
+            const fileTypeResult = await FileType.fromFile(filePath);
+
+            if (fileTypeResult) {
+                fromMagicNumber = fileTypeResult.mime;
+                confident = true;
+            } else {
+                // file-type couldn't detect the type, fall back to extension
+                fromMagicNumber = fromExtension;
+                confident = false;
+            }
+        } catch (error) {
+            logger.warn(`Could not detect MIME type via magic numbers for ${filePath}`, error);
+            // Fallback to extension-based detection
+            fromMagicNumber = fromExtension;
+            confident = false;
+        }
+
+        return {
+            fromExtension,
+            fromMagicNumber,
+            confident
         };
     }
 
@@ -101,11 +146,18 @@ class FileScanner {
 
     /**
      * Process a single file
+     * Performs both extension-based and magic number-based MIME type detection
      */
     async processFile(baseDir, filePath, incrementalScanning) {
         try {
             const stats = await fs.stat(filePath);
             this.stats.totalFiles++;
+
+            // Detect MIME type using both extension and magic numbers
+            const mimeDetection = await this.detectMimeType(filePath);
+
+            // Categorize file using detected MIME types
+            const category = await this.categorizeFile(filePath, mimeDetection);
 
             const fileInfo = {
                 path: filePath,
@@ -116,8 +168,9 @@ class FileScanner {
                 created: stats.birthtime.toISOString(),
                 modified: stats.mtime.toISOString(),
                 accessed: stats.atime.toISOString(),
-                mimeType: mime.lookup(filePath) || 'application/octet-stream',
-                category: this.categorizeFile(filePath)
+                mimeType: mimeDetection.fromMagicNumber || mimeDetection.fromExtension,
+                mimeDetection: mimeDetection,
+                category: category
             };
 
             // Check if file needs processing
@@ -173,31 +226,45 @@ class FileScanner {
     }
 
     /**
-     * Categorize file by type
+     * Categorize file by type using both extension and MIME type detection
+     * Considers both extension-based and magic number-based MIME types
+     *
+     * @param {string} filePath - Path to the file
+     * @param {Object} [mimeDetection] - Optional mimeDetection object from detectMimeType
+     * @returns {string} Category: 'image', 'video', 'audio', 'document', 'code', 'archive', 'spreadsheet', or 'other'
      */
-    categorizeFile(filePath) {
+    async categorizeFile(filePath, mimeDetection = null) {
         const ext = path.extname(filePath).slice(1).toLowerCase();
-        const mimeType = mime.lookup(filePath) || '';
+
+        // Use provided mimeDetection or detect it
+        if (!mimeDetection) {
+            mimeDetection = await this.detectMimeType(filePath);
+        }
+
+        // Use magic number detection first if confident, otherwise use extension detection
+        const mimeType = mimeDetection.confident ?
+            mimeDetection.fromMagicNumber :
+            mimeDetection.fromExtension;
 
         // Image files
-        if (mimeType.startsWith('image/')) {
+        if (mimeType && mimeType.startsWith('image/')) {
             return 'image';
         }
 
         // Video files
-        if (mimeType.startsWith('video/')) {
+        if (mimeType && mimeType.startsWith('video/')) {
             return 'video';
         }
 
         // Audio files
-        if (mimeType.startsWith('audio/')) {
+        if (mimeType && mimeType.startsWith('audio/')) {
             return 'audio';
         }
 
         // Document files
         const docExtensions = ['pdf', 'doc', 'docx', 'odt', 'rtf', 'txt', 'md', 'epub', 'mobi'];
-        if (docExtensions.includes(ext) || mimeType.startsWith('application/pdf') ||
-            mimeType.includes('document') || mimeType.includes('text')) {
+        if (docExtensions.includes(ext) || (mimeType && (mimeType.startsWith('application/pdf') ||
+            mimeType.includes('document') || mimeType.includes('text')))) {
             return 'document';
         }
 
@@ -214,14 +281,14 @@ class FileScanner {
 
         // Archive files
         const archiveExtensions = ['zip', 'tar', 'gz', 'bz2', 'xz', '7z', 'rar', 'tgz'];
-        if (archiveExtensions.includes(ext) || mimeType.includes('zip') ||
-            mimeType.includes('compressed') || mimeType.includes('archive')) {
+        if (archiveExtensions.includes(ext) || (mimeType && (mimeType.includes('zip') ||
+            mimeType.includes('compressed') || mimeType.includes('archive')))) {
             return 'archive';
         }
 
         // Spreadsheet files
         const spreadsheetExtensions = ['xls', 'xlsx', 'csv', 'ods'];
-        if (spreadsheetExtensions.includes(ext) || mimeType.includes('spreadsheet')) {
+        if (spreadsheetExtensions.includes(ext) || (mimeType && mimeType.includes('spreadsheet'))) {
             return 'spreadsheet';
         }
 

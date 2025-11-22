@@ -289,6 +289,40 @@ CREATE TABLE IF NOT EXISTS archive_metadata (
     FOREIGN KEY (file_id) REFERENCES files(id) ON DELETE CASCADE
 );
 
+-- Office document metadata (Word, Excel, PowerPoint, etc.)
+-- Stores detailed metadata for Microsoft Office and compatible formats
+CREATE TABLE IF NOT EXISTS office_metadata (
+    file_id INTEGER PRIMARY KEY,
+    -- Document classification
+    doc_type TEXT, -- 'document', 'spreadsheet', 'presentation', 'workbook', etc.
+    -- Content dimensions
+    page_count INTEGER, -- Number of pages (for Word, PDF, etc.)
+    word_count INTEGER, -- Total word count in document
+    sheet_count INTEGER, -- Number of sheets (for Excel)
+    slide_count INTEGER, -- Number of slides (for PowerPoint)
+    -- Content features
+    has_images BOOLEAN, -- Whether document contains images
+    has_tables BOOLEAN, -- Whether document contains tables
+    has_formulas BOOLEAN, -- Whether spreadsheet contains formulas
+    FOREIGN KEY (file_id) REFERENCES files(id) ON DELETE CASCADE
+);
+
+-- Font metadata
+-- Stores font information for documents, design files, and font files
+CREATE TABLE IF NOT EXISTS font_metadata (
+    file_id INTEGER PRIMARY KEY,
+    -- Font identification
+    family TEXT, -- Font family name (e.g., 'Arial', 'Helvetica')
+    style TEXT, -- Font style (e.g., 'Regular', 'Bold', 'Italic', 'Bold Italic')
+    weight INTEGER, -- Font weight (100-900 following CSS spec)
+    -- Font format and technical details
+    format TEXT, -- Font file format ('TTF', 'OTF', 'WOFF', 'WOFF2', 'EOT', etc.)
+    glyph_count INTEGER, -- Number of glyphs in the font
+    -- Supported content
+    languages TEXT, -- JSON array of supported language codes
+    FOREIGN KEY (file_id) REFERENCES files(id) ON DELETE CASCADE
+);
+
 -- Tags
 CREATE TABLE IF NOT EXISTS tags (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -332,6 +366,12 @@ CREATE INDEX IF NOT EXISTS idx_files_modified ON files(modified);
 CREATE INDEX IF NOT EXISTS idx_files_size ON files(size);
 CREATE INDEX IF NOT EXISTS idx_tags_tag ON tags(tag);
 CREATE INDEX IF NOT EXISTS idx_relationships_type ON relationships(relationship_type);
+-- Indexes for new metadata tables
+CREATE INDEX IF NOT EXISTS idx_office_metadata_file_id ON office_metadata(file_id);
+CREATE INDEX IF NOT EXISTS idx_office_metadata_doc_type ON office_metadata(doc_type);
+CREATE INDEX IF NOT EXISTS idx_font_metadata_file_id ON font_metadata(file_id);
+CREATE INDEX IF NOT EXISTS idx_font_metadata_family ON font_metadata(family);
+CREATE INDEX IF NOT EXISTS idx_font_metadata_format ON font_metadata(format);
 `;
 
 module.exports = {
