@@ -1,14 +1,19 @@
 /**
  * Base File Processor
  * Abstract base class for all file type processors
+ *
+ * Implements Template Method pattern to eliminate code duplication
+ * and ensure consistent processing across all file types.
  */
 
 const logger = require('../utils/logger');
+const fs = require('fs').promises;
 
 class BaseProcessor {
     constructor(config = {}) {
         this.config = config;
         this.name = this.constructor.name;
+        this.version = '1.0.0';
     }
 
     /**
@@ -21,36 +26,125 @@ class BaseProcessor {
     }
 
     /**
-     * Process file and extract metadata
+     * Template method for processing files
+     * Handles common processing flow: validation, metadata initialization,
+     * extraction, and completion tracking
+     *
      * @param {Object} fileInfo - File information object
      * @returns {Promise<Object>} - Enhanced file information with metadata
      */
     async process(fileInfo) {
-        throw new Error('process() must be implemented by subclass');
+        const startTime = Date.now();
+        this.logStart(fileInfo);
+
+        try {
+            // Validate file
+            if (!await this.validate(fileInfo)) {
+                return fileInfo;
+            }
+
+            // Initialize metadata structure
+            this.initializeMetadata(fileInfo);
+
+            // Perform actual metadata extraction (implemented by subclasses)
+            await this.extractMetadata(fileInfo);
+
+            // Record processing completion
+            this.recordProcessing(fileInfo, startTime);
+
+            this.logComplete(fileInfo, Date.now() - startTime);
+            return fileInfo;
+
+        } catch (error) {
+            return this.handleError(fileInfo, error);
+        }
+    }
+
+    /**
+     * Extract metadata - must be implemented by subclasses
+     * This is where the actual file-type-specific processing happens
+     *
+     * @param {Object} fileInfo - File information object
+     * @returns {Promise<void>}
+     */
+    async extractMetadata(fileInfo) {
+        throw new Error('extractMetadata() must be implemented by subclass');
+    }
+
+    /**
+     * Initialize metadata structure for this file type
+     * Subclasses can override to customize metadata structure
+     *
+     * @param {Object} fileInfo - File information object
+     */
+    initializeMetadata(fileInfo) {
+        if (!fileInfo.metadata) {
+            fileInfo.metadata = {};
+        }
+    }
+
+    /**
+     * Record processing metadata (timestamp, duration, version)
+     *
+     * @param {Object} fileInfo - File information object
+     * @param {number} startTime - Processing start timestamp
+     */
+    recordProcessing(fileInfo, startTime) {
+        fileInfo.processing = {
+            processedAt: new Date().toISOString(),
+            processingTime: Date.now() - startTime,
+            version: this.version,
+            errors: []
+        };
     }
 
     /**
      * Validate file before processing
+     * Checks file existence, type, and size constraints
+     *
+     * @param {Object} fileInfo - File information object
+     * @returns {Promise<boolean>} - True if valid, false otherwise
      */
     async validate(fileInfo) {
-        const fs = require('fs').promises;
-
         try {
             const stats = await fs.stat(fileInfo.path);
 
-            // Check if file exists and is readable
             if (!stats.isFile()) {
                 throw new Error('Not a regular file');
             }
 
-            // Check file size limits if configured
             if (this.config.maxFileSize && stats.size > this.config.maxFileSize) {
-                throw new Error(`File too large: ${stats.size} bytes`);
+                throw new Error(`File exceeds size limit: ${this.formatFileSize(stats.size)}`);
             }
 
             return true;
         } catch (error) {
             logger.error(`Validation failed for ${fileInfo.path}`, error);
+            return false;
+        }
+    }
+
+    /**
+     * Read file buffer (common operation for many processors)
+     *
+     * @param {string} filePath - Path to file
+     * @returns {Promise<Buffer>} - File buffer
+     */
+    async readFileBuffer(filePath) {
+        return await fs.readFile(filePath);
+    }
+
+    /**
+     * Check if file exists
+     *
+     * @param {string} filePath - Path to file
+     * @returns {Promise<boolean>} - True if exists, false otherwise
+     */
+    async fileExists(filePath) {
+        try {
+            await fs.access(filePath);
+            return true;
+        } catch {
             return false;
         }
     }

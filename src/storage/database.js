@@ -144,6 +144,16 @@ class DatabaseManager {
             this.upsertArchiveMetadata(fileId, fileData.metadata.archive);
         }
 
+        // Store office document metadata if present (can be combined with document category)
+        if (fileData.metadata?.office) {
+            this.upsertOfficeMetadata(fileId, fileData.metadata.office);
+        }
+
+        // Store font metadata if present
+        if (fileData.metadata?.font) {
+            this.upsertFontMetadata(fileId, fileData.metadata.font);
+        }
+
         // Insert tags
         if (fileData.tags && fileData.tags.length > 0) {
             this.upsertTags(fileId, fileData.tags);
@@ -366,6 +376,68 @@ class DatabaseManager {
             archiveData.compressionRatio,
             archiveData.fileCount,
             archiveData.encrypted ? 1 : 0
+        );
+    }
+
+    /**
+     * Insert/update office document metadata
+     */
+    upsertOfficeMetadata(fileId, officeData) {
+        const stmt = this.db.prepare(`
+            INSERT INTO office_metadata (
+                file_id, doc_type, page_count, word_count,
+                sheet_count, slide_count, has_images, has_tables, has_formulas
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(file_id) DO UPDATE SET
+                doc_type = excluded.doc_type,
+                page_count = excluded.page_count,
+                word_count = excluded.word_count,
+                sheet_count = excluded.sheet_count,
+                slide_count = excluded.slide_count,
+                has_images = excluded.has_images,
+                has_tables = excluded.has_tables,
+                has_formulas = excluded.has_formulas
+        `);
+
+        stmt.run(
+            fileId,
+            officeData.docType,
+            officeData.pageCount,
+            officeData.wordCount,
+            officeData.sheetCount,
+            officeData.slideCount,
+            officeData.hasImages ? 1 : 0,
+            officeData.hasTables ? 1 : 0,
+            officeData.hasFormulas ? 1 : 0
+        );
+    }
+
+    /**
+     * Insert/update font metadata
+     */
+    upsertFontMetadata(fileId, fontData) {
+        const stmt = this.db.prepare(`
+            INSERT INTO font_metadata (
+                file_id, family, style, weight, format,
+                glyph_count, languages
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(file_id) DO UPDATE SET
+                family = excluded.family,
+                style = excluded.style,
+                weight = excluded.weight,
+                format = excluded.format,
+                glyph_count = excluded.glyph_count,
+                languages = excluded.languages
+        `);
+
+        stmt.run(
+            fileId,
+            fontData.family,
+            fontData.style,
+            fontData.weight,
+            fontData.format,
+            fontData.glyphCount,
+            JSON.stringify(fontData.languages || [])
         );
     }
 
@@ -624,6 +696,36 @@ class DatabaseManager {
                     encrypted: archData.encrypted === 1
                 };
             }
+        }
+
+        // Check for office metadata (can exist alongside document metadata)
+        const officeStmt = this.db.prepare('SELECT * FROM office_metadata WHERE file_id = ?');
+        const officeData = officeStmt.get(fileId);
+        if (officeData) {
+            metadata.office = {
+                docType: officeData.doc_type,
+                pageCount: officeData.page_count,
+                wordCount: officeData.word_count,
+                sheetCount: officeData.sheet_count,
+                slideCount: officeData.slide_count,
+                hasImages: officeData.has_images === 1,
+                hasTables: officeData.has_tables === 1,
+                hasFormulas: officeData.has_formulas === 1
+            };
+        }
+
+        // Check for font metadata
+        const fontStmt = this.db.prepare('SELECT * FROM font_metadata WHERE file_id = ?');
+        const fontData = fontStmt.get(fileId);
+        if (fontData) {
+            metadata.font = {
+                family: fontData.family,
+                style: fontData.style,
+                weight: fontData.weight,
+                format: fontData.format,
+                glyphCount: fontData.glyph_count,
+                languages: fontData.languages ? JSON.parse(fontData.languages) : []
+            };
         }
 
         return Object.keys(metadata).length > 0 ? metadata : null;

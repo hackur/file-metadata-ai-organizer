@@ -8,6 +8,7 @@ const sharp = require('sharp');
 const exifr = require('exifr');
 const path = require('path');
 const fs = require('fs').promises;
+const gpsUtils = require('../utils/gps');
 
 class ImageProcessor extends BaseProcessor {
     constructor(config = {}) {
@@ -19,55 +20,45 @@ class ImageProcessor extends BaseProcessor {
         return fileInfo.category === 'image';
     }
 
-    async process(fileInfo) {
-        const startTime = Date.now();
-        this.logStart(fileInfo);
+    /**
+     * Initialize image-specific metadata structure
+     *
+     * @param {Object} fileInfo - File information object
+     */
+    initializeMetadata(fileInfo) {
+        super.initializeMetadata(fileInfo);
+        fileInfo.metadata.image = {};
+    }
 
-        try {
-            if (!await this.validate(fileInfo)) {
-                return fileInfo;
-            }
+    /**
+     * Extract image metadata
+     * Implements BaseProcessor.extractMetadata() template method
+     *
+     * @param {Object} fileInfo - File information object
+     * @returns {Promise<void>}
+     */
+    async extractMetadata(fileInfo) {
+        // Extract basic image info with sharp
+        await this.extractBasicInfo(fileInfo);
 
-            // Initialize metadata structure
-            if (!fileInfo.metadata) fileInfo.metadata = {};
-            fileInfo.metadata.image = {};
+        // Extract EXIF, IPTC, XMP data
+        if (this.config.extractExif !== false) {
+            await this.extractExifData(fileInfo);
+        }
 
-            // Extract basic image info with sharp
-            await this.extractBasicInfo(fileInfo);
+        // Extract dominant colors
+        if (this.config.extractColors !== false) {
+            await this.extractColors(fileInfo);
+        }
 
-            // Extract EXIF, IPTC, XMP data
-            if (this.config.extractExif !== false) {
-                await this.extractExifData(fileInfo);
-            }
+        // Generate thumbnails
+        if (this.config.generateThumbnails !== false) {
+            await this.generateThumbnails(fileInfo);
+        }
 
-            // Extract dominant colors
-            if (this.config.extractColors !== false) {
-                await this.extractColors(fileInfo);
-            }
-
-            // Generate thumbnails
-            if (this.config.generateThumbnails !== false) {
-                await this.generateThumbnails(fileInfo);
-            }
-
-            // Calculate perceptual hash
-            if (this.config.perceptualHash !== false) {
-                await this.calculatePerceptualHash(fileInfo);
-            }
-
-            const duration = Date.now() - startTime;
-            fileInfo.processing = {
-                processedAt: new Date().toISOString(),
-                processingTime: duration,
-                version: '1.0.0',
-                errors: []
-            };
-
-            this.logComplete(fileInfo, duration);
-            return fileInfo;
-
-        } catch (error) {
-            return this.handleError(fileInfo, error);
+        // Calculate perceptual hash
+        if (this.config.perceptualHash !== false) {
+            await this.calculatePerceptualHash(fileInfo);
         }
     }
 
@@ -131,10 +122,33 @@ class ImageProcessor extends BaseProcessor {
 
                 // Extract GPS data if available
                 if (exifData.latitude && exifData.longitude) {
+                    const lat = exifData.latitude;
+                    const lon = exifData.longitude;
+
+                    // Convert to DMS format
+                    const latDMS = gpsUtils.decimalToDMS(lat, lat >= 0 ? 'N' : 'S');
+                    const lonDMS = gpsUtils.decimalToDMS(lon, lon >= 0 ? 'E' : 'W');
+
                     fileInfo.metadata.image.exif.gps = {
-                        latitude: exifData.latitude,
-                        longitude: exifData.longitude,
-                        altitude: exifData.GPSAltitude
+                        // Decimal coordinates
+                        latitude: lat,
+                        longitude: lon,
+                        altitude: exifData.GPSAltitude,
+
+                        // DMS format
+                        latitudeDMS: latDMS,
+                        longitudeDMS: lonDMS,
+
+                        // Formatted strings
+                        formatted: gpsUtils.formatCoordinates(lat, lon, { format: 'DMS' }),
+                        formattedDecimal: gpsUtils.formatCoordinates(lat, lon, { format: 'decimal' }),
+
+                        // Links and utilities
+                        googleMapsLink: gpsUtils.generateGoogleMapsLink(lat, lon),
+                        openStreetMapLink: gpsUtils.generateOpenStreetMapLink(lat, lon),
+
+                        // GeoJSON point
+                        geoJSON: gpsUtils.toGeoJSON(lat, lon)
                     };
                 }
 

@@ -18,41 +18,24 @@ class VideoProcessor extends BaseProcessor {
         return fileInfo.category === 'video';
     }
 
-    async process(fileInfo) {
-        const startTime = Date.now();
-        this.logStart(fileInfo);
-
-        try {
-            if (!await this.validate(fileInfo)) {
-                return fileInfo;
-            }
-
-            if (!fileInfo.metadata) fileInfo.metadata = {};
-            fileInfo.metadata.video = {};
-
-            // Extract metadata using ffprobe
-            await this.extractVideoMetadata(fileInfo);
-
-            const duration = Date.now() - startTime;
-            fileInfo.processing = {
-                processedAt: new Date().toISOString(),
-                processingTime: duration,
-                version: '1.0.0',
-                errors: []
-            };
-
-            this.logComplete(fileInfo, duration);
-            return fileInfo;
-
-        } catch (error) {
-            return this.handleError(fileInfo, error);
-        }
+    /**
+     * Initialize video-specific metadata structure
+     *
+     * @param {Object} fileInfo - File information object
+     */
+    initializeMetadata(fileInfo) {
+        super.initializeMetadata(fileInfo);
+        fileInfo.metadata.video = {};
     }
 
     /**
      * Extract video metadata using ffprobe
+     * Implements BaseProcessor.extractMetadata() template method
+     *
+     * @param {Object} fileInfo - File information object
+     * @returns {Promise<void>}
      */
-    async extractVideoMetadata(fileInfo) {
+    async extractMetadata(fileInfo) {
         try {
             const args = [
                 '-v', 'quiet',

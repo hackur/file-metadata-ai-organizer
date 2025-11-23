@@ -8,7 +8,6 @@ const fs = require('fs').promises;
 const path = require('path');
 const { createReadStream } = require('fs');
 const mime = require('mime-types');
-const FileType = require('file-type');
 const hashUtil = require('./hash');
 const logger = require('./logger');
 
@@ -16,6 +15,7 @@ class FileScanner {
     constructor(database, ignoreManager) {
         this.db = database;
         this.ignoreManager = ignoreManager;
+        this.fileType = null;
         this.stats = {
             totalFiles: 0,
             newFiles: 0,
@@ -23,6 +23,20 @@ class FileScanner {
             unchangedFiles: 0,
             errors: 0
         };
+    }
+
+    /**
+     * Initialize file-type library (ESM module, requires dynamic import)
+     */
+    async initFileType() {
+        if (!this.fileType) {
+            try {
+                this.fileType = await import('file-type');
+            } catch (error) {
+                logger.warn('file-type library not available, using extension-based MIME detection only');
+                this.fileType = null;
+            }
+        }
     }
 
     /**
@@ -43,14 +57,25 @@ class FileScanner {
         let fromMagicNumber = null;
         let confident = false;
 
-        try {
-            const fileTypeResult = await FileType.fromFile(filePath);
+        // Ensure file-type is initialized
+        if (!this.fileType) {
+            await this.initFileType();
+        }
 
-            if (fileTypeResult) {
-                fromMagicNumber = fileTypeResult.mime;
-                confident = true;
+        try {
+            if (this.fileType && this.fileType.fileTypeFromFile) {
+                const fileTypeResult = await this.fileType.fileTypeFromFile(filePath);
+
+                if (fileTypeResult) {
+                    fromMagicNumber = fileTypeResult.mime;
+                    confident = true;
+                } else {
+                    // file-type couldn't detect the type, fall back to extension
+                    fromMagicNumber = fromExtension;
+                    confident = false;
+                }
             } else {
-                // file-type couldn't detect the type, fall back to extension
+                // file-type not available
                 fromMagicNumber = fromExtension;
                 confident = false;
             }

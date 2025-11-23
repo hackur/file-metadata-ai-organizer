@@ -6,17 +6,20 @@ A comprehensive file metadata extraction and analysis tool optimized for AI/LLM 
 
 ### 🎯 Core Capabilities
 - **Incremental Scanning**: Skip unchanged files for faster re-scans
-- **Multi-format Support**: Images, videos, audio, PDFs, code, archives, markdown
+- **Multi-format Support**: Images, videos, audio, PDFs, Office docs, code, archives, fonts, markdown
 - **Dual Storage**: SQLite database + JSON export
 - **LLM Optimization**: Token-aware context generation for AI models
-- **Rich Metadata**: EXIF, ID3, code metrics, perceptual hashes, and more
+- **Rich Metadata**: EXIF, ID3, GPS formatting, code metrics, perceptual hashes, and more
+- **Magic Number Detection**: Standards-compliant MIME type detection
 
 ### 📸 Image Analysis
 - Dimensions, color space, bit depth
 - EXIF/IPTC/XMP extraction (camera, GPS, copyright)
+- **GPS Coordinate Formatting**: DMS, decimal, Google Maps links, GeoJSON
 - Dominant color extraction
 - Thumbnail generation
 - Perceptual hash for similarity detection
+- Magic number MIME type detection
 
 ### 🎬 Video & Audio
 - Duration, codec, bitrate, resolution
@@ -32,6 +35,13 @@ A comprehensive file metadata extraction and analysis tool optimized for AI/LLM 
 - Front matter extraction
 - Document summaries
 
+### 📊 Office Document Support
+- **Microsoft Office**: DOCX, XLSX, PPTX (and legacy DOC, XLS, PPT)
+- Word document analysis (word count, page count, images, tables)
+- Excel spreadsheet analysis (sheet names, formulas, cell statistics)
+- PowerPoint presentation analysis (slide count, images)
+- LibreOffice/OpenOffice compatible formats
+
 ### 💻 Code Analysis
 - Lines of code (total, code, comments, blank)
 - Language detection (35+ languages)
@@ -44,6 +54,13 @@ A comprehensive file metadata extraction and analysis tool optimized for AI/LLM 
 - File listing without extraction
 - Compression ratio calculation
 - Size analysis
+
+### 🔤 Font File Support
+- **Font Formats**: TTF, OTF, WOFF, WOFF2
+- Font family, style, and weight detection
+- Glyph count and character set analysis
+- Language support detection
+- OpenType feature extraction
 
 ### 🤖 LLM Integration
 - Token-aware context generation
@@ -300,7 +317,9 @@ file-metadata-ai-organizer/
 │   │   ├── PDFProcessor.js
 │   │   ├── CodeProcessor.js
 │   │   ├── ArchiveProcessor.js
-│   │   └── MarkdownProcessor.js
+│   │   ├── MarkdownProcessor.js
+│   │   ├── OfficeProcessor.js    # NEW: DOCX/XLSX/PPTX support
+│   │   └── FontProcessor.js      # NEW: TTF/OTF/WOFF support
 │   ├── storage/               # Data storage
 │   │   ├── database.js
 │   │   ├── schema.js
@@ -314,7 +333,8 @@ file-metadata-ai-organizer/
 │       ├── logger.js
 │       ├── hash.js
 │       ├── scanner.js
-│       └── progress.js
+│       ├── progress.js
+│       └── gps.js                # NEW: GPS coordinate utilities
 ├── data/                      # Generated data
 │   ├── metadata.db           # SQLite database
 │   └── metadata.json         # JSON export

@@ -16,6 +16,8 @@ const PDFProcessor = require('./processors/PDFProcessor');
 const CodeProcessor = require('./processors/CodeProcessor');
 const ArchiveProcessor = require('./processors/ArchiveProcessor');
 const MarkdownProcessor = require('./processors/MarkdownProcessor');
+const OfficeProcessor = require('./processors/OfficeProcessor');
+const FontProcessor = require('./processors/FontProcessor');
 
 class MetadataAnalyzer {
     constructor(config) {
@@ -72,6 +74,14 @@ class MetadataAnalyzer {
 
         if (extractorConfig.archives?.enabled !== false) {
             this.processors.push(new ArchiveProcessor(extractorConfig.archives));
+        }
+
+        if (extractorConfig.office?.enabled !== false) {
+            this.processors.push(new OfficeProcessor(extractorConfig.office));
+        }
+
+        if (extractorConfig.fonts?.enabled !== false) {
+            this.processors.push(new FontProcessor(extractorConfig.fonts));
         }
 
         logger.info(`Initialized ${this.processors.length} file processors`);

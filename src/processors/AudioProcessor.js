@@ -23,41 +23,24 @@ class AudioProcessor extends BaseProcessor {
         return fileInfo.category === 'audio';
     }
 
-    async process(fileInfo) {
-        const startTime = Date.now();
-        this.logStart(fileInfo);
-
-        try {
-            if (!await this.validate(fileInfo)) {
-                return fileInfo;
-            }
-
-            if (!fileInfo.metadata) fileInfo.metadata = {};
-            fileInfo.metadata.audio = {};
-
-            // Extract audio metadata
-            await this.extractAudioMetadata(fileInfo);
-
-            const duration = Date.now() - startTime;
-            fileInfo.processing = {
-                processedAt: new Date().toISOString(),
-                processingTime: duration,
-                version: '1.0.0',
-                errors: []
-            };
-
-            this.logComplete(fileInfo, duration);
-            return fileInfo;
-
-        } catch (error) {
-            return this.handleError(fileInfo, error);
-        }
+    /**
+     * Initialize audio-specific metadata structure
+     *
+     * @param {Object} fileInfo - File information object
+     */
+    initializeMetadata(fileInfo) {
+        super.initializeMetadata(fileInfo);
+        fileInfo.metadata.audio = {};
     }
 
     /**
      * Extract audio metadata using music-metadata
+     * Implements BaseProcessor.extractMetadata() template method
+     *
+     * @param {Object} fileInfo - File information object
+     * @returns {Promise<void>}
      */
-    async extractAudioMetadata(fileInfo) {
+    async extractMetadata(fileInfo) {
         try {
             const mm = await this.ensureMusicMetadata();
             const metadata = await mm.parseFile(fileInfo.path);
