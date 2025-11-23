@@ -108,11 +108,14 @@ class FileScanner {
             newFiles: 0,
             modifiedFiles: 0,
             unchangedFiles: 0,
-            errors: 0
+            errors: 0,
+            skippedSymlinks: 0
         };
 
         const files = [];
-        await this.scanDirectory(directory, directory, files, 0, maxDepth, followSymlinks, incrementalScanning);
+        // Track visited inodes to prevent circular symlink loops
+        const visitedInodes = new Set();
+        await this.scanDirectory(directory, directory, files, 0, maxDepth, followSymlinks, incrementalScanning, visitedInodes);
 
         return {
             files,
@@ -123,17 +126,33 @@ class FileScanner {
     /**
      * Recursively scan a directory
      */
-    async scanDirectory(baseDir, currentDir, files, depth, maxDepth, followSymlinks, incrementalScanning) {
+    async scanDirectory(baseDir, currentDir, files, depth, maxDepth, followSymlinks, incrementalScanning, visitedInodes) {
         if (maxDepth >= 0 && depth > maxDepth) {
             return;
         }
 
         try {
+            // Get real path stats to detect circular symlinks
+            const stats = await fs.stat(currentDir);
+            const inodeKey = `${stats.dev}:${stats.ino}`;
+
+            // Check if we've already visited this inode (circular symlink detection)
+            if (visitedInodes.has(inodeKey)) {
+                logger.warn(`Skipping circular symlink: ${currentDir}`);
+                this.stats.skippedSymlinks++;
+                return;
+            }
+
+            // Mark this inode as visited
+            visitedInodes.add(inodeKey);
+
             const entries = await fs.readdir(currentDir, { withFileTypes: true });
             const relativePath = path.relative(baseDir, currentDir);
 
             // Check if directory is ignored
             if (relativePath && this.ignoreManager && this.ignoreManager.ignores(relativePath)) {
+                // Remove from visited set since we're not actually processing it
+                visitedInodes.delete(inodeKey);
                 return;
             }
 
@@ -154,15 +173,48 @@ class FileScanner {
                         depth + 1,
                         maxDepth,
                         followSymlinks,
-                        incrementalScanning
+                        incrementalScanning,
+                        visitedInodes
                     );
-                } else if (entry.isFile() || (followSymlinks && entry.isSymbolicLink())) {
+                } else if (entry.isSymbolicLink()) {
+                    // Handle symlinks specially
+                    if (followSymlinks) {
+                        try {
+                            const linkStats = await fs.stat(fullPath);
+                            if (linkStats.isDirectory()) {
+                                // It's a symlink to a directory
+                                await this.scanDirectory(
+                                    baseDir,
+                                    fullPath,
+                                    files,
+                                    depth + 1,
+                                    maxDepth,
+                                    followSymlinks,
+                                    incrementalScanning,
+                                    visitedInodes
+                                );
+                            } else if (linkStats.isFile()) {
+                                // It's a symlink to a file
+                                const fileInfo = await this.processFile(baseDir, fullPath, incrementalScanning);
+                                if (fileInfo) {
+                                    files.push(fileInfo);
+                                }
+                            }
+                        } catch (error) {
+                            logger.warn(`Could not follow symlink ${fullPath}: ${error.message}`);
+                            this.stats.skippedSymlinks++;
+                        }
+                    }
+                } else if (entry.isFile()) {
                     const fileInfo = await this.processFile(baseDir, fullPath, incrementalScanning);
                     if (fileInfo) {
                         files.push(fileInfo);
                     }
                 }
             }
+
+            // Remove from visited set after processing (allows visiting same dir in different branches)
+            visitedInodes.delete(inodeKey);
         } catch (error) {
             logger.error(`Error scanning directory ${currentDir}`, error);
             this.stats.errors++;

@@ -211,6 +211,41 @@ class GPSUtil {
     }
 
     /**
+     * Generate OpenStreetMap link from coordinates
+     * @param {number} latitude - Latitude in decimal format
+     * @param {number} longitude - Longitude in decimal format
+     * @param {Object} options - Additional options
+     * @param {number} options.zoom - Map zoom level (default: 15)
+     * @param {string} options.marker - Whether to include a marker (default: true)
+     * @returns {string} OpenStreetMap URL
+     * @throws {Error} If coordinates are invalid
+     */
+    generateOpenStreetMapLink(latitude, longitude, options = {}) {
+        if (!validateCoordinates(latitude, longitude)) {
+            throw new Error('Invalid coordinates: latitude must be -90 to 90, longitude must be -180 to 180');
+        }
+
+        const {
+            zoom = 15,
+            marker = true
+        } = options;
+
+        if (zoom < 0 || zoom > 19) {
+            throw new Error('Zoom level must be between 0 and 19');
+        }
+
+        let url = `https://www.openstreetmap.org/?mlat=${latitude}&mlon=${longitude}`;
+
+        if (marker) {
+            url += `#map=${zoom}/${latitude}/${longitude}`;
+        } else {
+            url = `https://www.openstreetmap.org/#map=${zoom}/${latitude}/${longitude}`;
+        }
+
+        return url;
+    }
+
+    /**
      * Calculate distance between two GPS points using Haversine formula
      * @param {number} lat1 - Latitude of first point
      * @param {number} lon1 - Longitude of first point
@@ -489,6 +524,29 @@ class GPSUtil {
             longitude >= west &&
             longitude <= east
         );
+    }
+
+    /**
+     * Convert coordinates to GeoJSON format
+     * @param {number} latitude - Latitude in decimal format
+     * @param {number} longitude - Longitude in decimal format
+     * @param {Object} properties - Optional additional properties
+     * @returns {Object} GeoJSON Point feature
+     * @throws {Error} If coordinates are invalid
+     */
+    toGeoJSON(latitude, longitude, properties = {}) {
+        if (!validateCoordinates(latitude, longitude)) {
+            throw new Error('Invalid coordinates: latitude must be -90 to 90, longitude must be -180 to 180');
+        }
+
+        return {
+            type: 'Feature',
+            geometry: {
+                type: 'Point',
+                coordinates: [longitude, latitude] // GeoJSON uses [lon, lat] order
+            },
+            properties: properties
+        };
     }
 
     /**

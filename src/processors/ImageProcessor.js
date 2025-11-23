@@ -179,12 +179,15 @@ class ImageProcessor extends BaseProcessor {
                 .resize(100, 100, { fit: 'cover' })
                 .stats();
 
-            fileInfo.metadata.image.dominantColors = dominant.map(color => ({
-                r: color.r,
-                g: color.g,
-                b: color.b,
-                hex: this.rgbToHex(color.r, color.g, color.b)
-            }));
+            // dominant is a single color object, not an array
+            if (dominant && typeof dominant === 'object') {
+                fileInfo.metadata.image.dominantColor = {
+                    r: Math.round(dominant.r),
+                    g: Math.round(dominant.g),
+                    b: Math.round(dominant.b),
+                    hex: this.rgbToHex(Math.round(dominant.r), Math.round(dominant.g), Math.round(dominant.b))
+                };
+            }
 
         } catch (error) {
             console.warn(`Could not extract colors from ${fileInfo.path}: ${error.message}`);
