@@ -122,6 +122,10 @@ class FontProcessor extends BaseProcessor {
             // Parse font using fontkit
             const font = this.fontkit.create(buffer);
 
+            // Set format based on file extension
+            const extension = path.extname(fileInfo.name).toLowerCase().slice(1);
+            fileInfo.metadata.font.format = this.normalizeFormatName(extension);
+
             // Extract basic naming information
             this.extractNamingInfo(fileInfo, font);
 
@@ -157,13 +161,10 @@ class FontProcessor extends BaseProcessor {
      */
     extractNamingInfo(fileInfo, font) {
         try {
-            const tables = font.getAvailableTables();
-
             fileInfo.metadata.font.family = font.familyName || 'Unknown';
             fileInfo.metadata.font.subfamily = font.subfamilyName || 'Regular';
             fileInfo.metadata.font.fullName = font.fullName || `${font.familyName} ${font.subfamilyName}`;
             fileInfo.metadata.font.postScriptName = font.postscriptName || null;
-            fileInfo.metadata.font.uniqueIdentifier = font.uniqueID || null;
 
             // Extract manufacturer and designer info if available
             if (font.manufacturer) {
@@ -222,12 +223,10 @@ class FontProcessor extends BaseProcessor {
      */
     extractGlyphInfo(fileInfo, font) {
         try {
-            // Get available character codes
-            const characterCodes = [];
-            const glyphCollection = font.glyphs || [];
+            // Get glyph count directly from font
+            fileInfo.metadata.font.glyphCount = font.numGlyphs || 0;
 
-            // Count glyphs and collect character mappings
-            fileInfo.metadata.font.glyphCount = glyphCollection.length || 0;
+            const glyphCollection = font.glyphs || [];
 
             // Analyze glyph metrics
             if (glyphCollection.length > 0) {
@@ -337,12 +336,13 @@ class FontProcessor extends BaseProcessor {
             };
 
             const cmap = font.cmap;
-            if (cmap && cmap.glyphIdToCharCode) {
-                const characterMap = cmap.glyphIdToCharCode;
-
-                // Analyze character coverage
-                for (const [charCode] of Object.entries(characterMap)) {
-                    const code = parseInt(charCode);
+            if (cmap) {
+                // Iterate through cmap tables to analyze character coverage
+                const tables = cmap.tables || [];
+                for (const table of tables) {
+                    if (table.codeMap) {
+                        for (const charCode of Object.keys(table.codeMap)) {
+                            const code = parseInt(charCode);
 
                     // Basic Latin (U+0000 to U+007F)
                     if (code >= 0x0000 && code <= 0x007F) {
@@ -393,10 +393,27 @@ class FontProcessor extends BaseProcessor {
                              (code >= 0x2600 && code <= 0x27BF)) {
                         characterSets.hasEmoji = true;
                     }
+                        }
+                    }
                 }
             }
 
             fileInfo.metadata.font.characterSets = characterSets;
+
+            // Create languages array from character sets
+            const languages = [];
+            if (characterSets.hasBasicLatin) languages.push('en');
+            if (characterSets.hasGreek) languages.push('el');
+            if (characterSets.hasCyrillic) languages.push('ru');
+            if (characterSets.hasArabic) languages.push('ar');
+            if (characterSets.hasHebrew) languages.push('he');
+            if (characterSets.hasDevanagari) languages.push('hi');
+            if (characterSets.hasHangul) languages.push('ko');
+            if (characterSets.hasCJK) languages.push('zh', 'ja');
+
+            if (languages.length > 0) {
+                fileInfo.metadata.font.languages = languages;
+            }
 
         } catch (error) {
             logger.warn(`Could not extract character coverage: ${error.message}`);

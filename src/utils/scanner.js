@@ -369,6 +369,19 @@ class FileScanner {
             return 'spreadsheet';
         }
 
+        // Font files
+        const fontExtensions = ['ttf', 'otf', 'woff', 'woff2', 'eot', 'ttc', 'otc'];
+        if (fontExtensions.includes(ext) || (mimeType && mimeType.includes('font'))) {
+            return 'font';
+        }
+
+        // Office files (that aren't spreadsheets)
+        const officeExtensions = ['docx', 'doc', 'pptx', 'ppt', 'odt', 'odp'];
+        if (officeExtensions.includes(ext) || (mimeType && (mimeType.includes('officedocument') ||
+            mimeType.includes('presentation') || mimeType.includes('wordprocessing')))) {
+            return 'office';
+        }
+
         return 'other';
     }
 
