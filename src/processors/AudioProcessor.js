@@ -4,7 +4,6 @@
  */
 
 const BaseProcessor = require('./BaseProcessor');
-const fs = require('fs');
 
 class AudioProcessor extends BaseProcessor {
     constructor(config = {}) {

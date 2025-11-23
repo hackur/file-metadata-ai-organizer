@@ -229,7 +229,7 @@ class ImageProcessor extends BaseProcessor {
     async calculatePerceptualHash(fileInfo) {
         try {
             // Create a simple perceptual hash (pHash-like)
-            const { data, info } = await sharp(fileInfo.path)
+            const { data } = await sharp(fileInfo.path)
                 .resize(8, 8, { fit: 'fill' })
                 .greyscale()
                 .raw()
