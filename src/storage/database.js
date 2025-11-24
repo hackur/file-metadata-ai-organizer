@@ -1,6 +1,23 @@
 /**
  * Database Manager
- * Handles both SQLite and JSON storage for file metadata
+ *
+ * Manages dual storage backends (SQLite and JSON) for file metadata.
+ * Provides a unified API for storing and querying file information
+ * regardless of storage backend.
+ *
+ * Features:
+ * - SQLite: Structured relational database with full-text search
+ * - JSON: Flat file storage for portability and easy inspection
+ * - Dual mode: Write to both simultaneously for redundancy
+ * - Automatic schema management
+ * - Type-specific metadata tables (image, video, audio, document, etc.)
+ *
+ * Storage modes:
+ * - 'sqlite': Use only SQLite database (best performance for queries)
+ * - 'json': Use only JSON file (portable, human-readable)
+ * - 'both': Write to both backends (redundancy, flexibility)
+ *
+ * @see https://github.com/WiseLibs/better-sqlite3 - SQLite library
  */
 
 const Database = require('better-sqlite3');
@@ -10,6 +27,19 @@ const { sqliteSchema, metadataSchema, fileMetadataTemplate } = require('./schema
 const logger = require('../utils/logger');
 
 class DatabaseManager {
+    /**
+     * Create a DatabaseManager instance
+     *
+     * Initializes storage properties to null.
+     * Call init() to set up the actual storage backends.
+     *
+     * @example
+     * const dbManager = require('./storage/database');
+     * await dbManager.init({
+     *   type: 'sqlite',
+     *   dbPath: './data/metadata.db'
+     * });
+     */
     constructor() {
         this.db = null;
         this.config = null;
@@ -18,6 +48,30 @@ class DatabaseManager {
 
     /**
      * Initialize database with configuration
+     *
+     * Sets up one or both storage backends based on config.type.
+     * Creates necessary directories and initializes schemas.
+     *
+     * @param {Object} config - Database configuration
+     * @param {string} config.type - Storage type: 'sqlite', 'json', or 'both'
+     * @param {string} [config.dbPath] - Path to SQLite database file (required if type includes 'sqlite')
+     * @param {string} [config.jsonPath] - Path to JSON data file (required if type includes 'json')
+     * @returns {Promise<void>} Resolves when initialization is complete
+     *
+     * @example
+     * // SQLite only
+     * await dbManager.init({
+     *   type: 'sqlite',
+     *   dbPath: './data/metadata.db'
+     * });
+     *
+     * @example
+     * // Both backends for redundancy
+     * await dbManager.init({
+     *   type: 'both',
+     *   dbPath: './data/metadata.db',
+     *   jsonPath: './data/metadata.json'
+     * });
      */
     async init(config) {
         this.config = config;
@@ -35,6 +89,32 @@ class DatabaseManager {
 
     /**
      * Initialize SQLite database
+     *
+     * Creates or opens an SQLite database file and configures it for optimal
+     * performance and data integrity. Executes the full schema creation script
+     * to set up all tables, indexes, and triggers.
+     *
+     * SQLite pragmas configured:
+     * - WAL mode: Write-Ahead Logging for better concurrency and crash recovery
+     * - Foreign keys: Enabled for referential integrity (CASCADE deletes)
+     *
+     * Schema includes:
+     * - Main files table with FTS5 full-text search index
+     * - Type-specific metadata tables (image, video, audio, code, etc.)
+     * - EXIF data table (JSON storage for flexibility)
+     * - Tags table for categorization
+     *
+     * @param {string} dbPath - Absolute or relative path to SQLite database file
+     * @returns {Promise<void>} Resolves when database is initialized
+     *
+     * @see https://www.sqlite.org/wal.html - Write-Ahead Logging
+     * @see https://www.sqlite.org/foreignkeys.html - Foreign key support
+     *
+     * @example
+     * await dbManager.initSQLite('./data/metadata.db');
+     * // Database created with full schema at ./data/metadata.db
+     *
+     * @private
      */
     async initSQLite(dbPath) {
         const dbDir = path.dirname(dbPath);
@@ -72,6 +152,48 @@ class DatabaseManager {
 
     /**
      * Insert or update file metadata
+     *
+     * Main method for storing file metadata to the configured storage backend(s).
+     * Handles both new files (INSERT) and existing files (UPDATE) automatically
+     * using SQL UPSERT or array replacement for JSON.
+     *
+     * For SQLite:
+     * - Inserts into main files table
+     * - Routes type-specific metadata to appropriate tables
+     * - Stores EXIF data as JSON
+     * - Manages tags in separate table
+     * - Uses transactions for atomicity
+     *
+     * For JSON:
+     * - Adds or replaces file in files array
+     * - Updates summary statistics
+     * - Keeps data in memory (call saveJSON() to persist)
+     *
+     * @param {Object} fileData - Complete file information object
+     * @param {string} fileData.path - Absolute file path (unique identifier)
+     * @param {string} fileData.name - Filename with extension
+     * @param {string} fileData.category - File category ('image', 'video', 'audio', etc.)
+     * @param {Object} [fileData.metadata] - Type-specific metadata (image, video, font, etc.)
+     * @param {Object} [fileData.hash] - File hashes (md5, sha256)
+     * @param {string[]} [fileData.tags] - User tags for categorization
+     * @returns {Promise<void>} Resolves when file is stored
+     *
+     * @example
+     * await dbManager.upsertFile({
+     *   path: '/photos/IMG_001.jpg',
+     *   name: 'IMG_001.jpg',
+     *   category: 'image',
+     *   size: 2048576,
+     *   metadata: {
+     *     image: {
+     *       width: 1920,
+     *       height: 1080,
+     *       exif: { make: 'Canon', ... }
+     *     }
+     *   },
+     *   hash: { md5: '...', sha256: '...' },
+     *   tags: ['vacation', '2024']
+     * });
      */
     async upsertFile(fileData) {
         if (this.db) {
@@ -507,6 +629,18 @@ class DatabaseManager {
 
     /**
      * Get file by path
+     *
+     * Retrieves complete file information for a single file by its path.
+     * Returns the file record with all associated metadata.
+     *
+     * @param {string} filePath - Absolute file path to look up
+     * @returns {Object|null} File object with metadata, or null if not found
+     *
+     * @example
+     * const file = dbManager.getFile('/photos/IMG_001.jpg');
+     * if (file) {
+     *   console.log(`${file.name}: ${file.metadata.image.width}x${file.metadata.image.height}`);
+     * }
      */
     getFile(filePath) {
         if (this.db) {
@@ -523,6 +657,40 @@ class DatabaseManager {
 
     /**
      * Query files with filters
+     *
+     * Searches for files matching the specified criteria.
+     * Supports filtering by category, extension, size range, and result limits.
+     *
+     * Available filters:
+     * - category: File type ('image', 'video', 'audio', 'code', etc.)
+     * - extension: File extension without dot ('jpg', 'mp4', 'ttf')
+     * - minSize: Minimum file size in bytes
+     * - maxSize: Maximum file size in bytes
+     * - limit: Maximum number of results to return
+     *
+     * For SQLite: Executes parameterized SQL query
+     * For JSON: Filters in-memory array
+     *
+     * @param {Object} [filters={}] - Query filters
+     * @param {string} [filters.category] - Filter by file category
+     * @param {string} [filters.extension] - Filter by file extension
+     * @param {number} [filters.minSize] - Minimum file size in bytes
+     * @param {number} [filters.maxSize] - Maximum file size in bytes
+     * @param {number} [filters.limit] - Maximum number of results
+     * @returns {Object[]} Array of matching file objects with metadata
+     *
+     * @example
+     * // Find large JPEGs
+     * const largeImages = dbManager.queryFiles({
+     *   category: 'image',
+     *   extension: 'jpg',
+     *   minSize: 1000000,
+     *   limit: 100
+     * });
+     *
+     * @example
+     * // Find all fonts
+     * const fonts = dbManager.queryFiles({ category: 'font' });
      */
     queryFiles(filters = {}) {
         if (this.db) {
@@ -610,6 +778,40 @@ class DatabaseManager {
 
     /**
      * Get metadata for a file based on category
+     *
+     * Retrieves type-specific metadata from the appropriate table(s)
+     * and transforms database column names (snake_case) to JavaScript
+     * property names (camelCase).
+     *
+     * Fetches from category-specific tables:
+     * - code: language, line counts, complexity
+     * - image: dimensions, color space, EXIF data
+     * - video: duration, resolution, codecs
+     * - audio: duration, bitrate, ID3 tags
+     * - document: page count, word count, author
+     * - archive: format, compression, file count
+     *
+     * Additionally checks for:
+     * - office: Office document metadata (can coexist with document)
+     * - font: Font metadata (family, glyphs, languages)
+     *
+     * @param {number} fileId - Database file ID
+     * @param {string} category - File category ('image', 'video', 'code', etc.)
+     * @returns {Object|null} Metadata object with category-specific properties, or null if no metadata found
+     *
+     * @example
+     * const metadata = dbManager.getFileMetadata(123, 'image');
+     * // Returns:
+     * // {
+     * //   image: {
+     * //     width: 1920,
+     * //     height: 1080,
+     * //     aspectRatio: 1.777,
+     * //     ...
+     * //   }
+     * // }
+     *
+     * @private
      */
     getFileMetadata(fileId, category) {
         const metadata = {};
@@ -762,6 +964,15 @@ class DatabaseManager {
 
     /**
      * Save JSON data to file
+     *
+     * Writes the in-memory JSON data to disk with pretty-printing (2-space indentation).
+     * Only executes if JSON storage is configured.
+     *
+     * @returns {Promise<void>} Resolves when file is written
+     *
+     * @example
+     * // After making changes to JSON data
+     * await dbManager.saveJSON();
      */
     async saveJSON() {
         if (this.jsonData && this.config.jsonPath) {
@@ -773,6 +984,21 @@ class DatabaseManager {
 
     /**
      * Close database connections
+     *
+     * Properly shuts down all storage backends:
+     * - Closes SQLite database connection (flushes WAL)
+     * - Saves JSON data to disk
+     *
+     * Always call this method before application exit to ensure:
+     * - All pending writes are flushed
+     * - Database file is not corrupted
+     * - JSON changes are persisted
+     *
+     * @returns {Promise<void>} Resolves when all storage is closed
+     *
+     * @example
+     * // At application shutdown
+     * await dbManager.close();
      */
     async close() {
         if (this.db) {

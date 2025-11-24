@@ -10,12 +10,17 @@
  *
  * Extracted Metadata:
  * - Font family, subfamily, full name
- * - Font weight, style, stretch
- * - Glyph count and character coverage
- * - OpenType features
- * - Supported scripts and languages
- * - Font variations (for variable fonts)
- * - Licensing information
+ * - Font weight (100-900), style (normal/italic/oblique), stretch
+ * - Glyph count and character coverage (Basic Latin, Greek, Cyrillic, CJK, etc.)
+ * - OpenType features (ligatures, small caps, alternates, etc.)
+ * - Supported scripts and languages (auto-detected from character coverage)
+ * - Font variations (for variable fonts with multiple axes)
+ * - Typography flags (monospace, serif detection)
+ * - Licensing information (copyright, license, trademark)
+ *
+ * @requires fontkit - Optional but recommended for comprehensive metadata extraction
+ * @see https://github.com/foliojs/fontkit - fontkit library documentation
+ * @see https://docs.microsoft.com/en-us/typography/opentype/spec/ - OpenType specification
  */
 
 const BaseProcessor = require('./BaseProcessor');
@@ -24,6 +29,22 @@ const path = require('path');
 const logger = require('../utils/logger');
 
 class FontProcessor extends BaseProcessor {
+    /**
+     * Create a FontProcessor instance
+     *
+     * Automatically attempts to load the fontkit library on construction.
+     * If fontkit is not available, falls back to basic font information extraction.
+     *
+     * @param {Object} config - Configuration options (passed to BaseProcessor)
+     *
+     * @example
+     * const processor = new FontProcessor();
+     * if (processor.fontkitAvailable) {
+     *   console.log('Full font metadata extraction available');
+     * } else {
+     *   console.log('Install fontkit: npm install fontkit');
+     * }
+     */
     constructor(config = {}) {
         super(config);
         this.fontkit = null;
@@ -33,7 +54,19 @@ class FontProcessor extends BaseProcessor {
 
     /**
      * Initialize and check fontkit availability
-     * fontkit is required for parsing font files
+     *
+     * Attempts to load the fontkit library via require().
+     * fontkit is an optional dependency that enables comprehensive
+     * font metadata extraction. If unavailable, the processor falls
+     * back to basic file information only.
+     *
+     * Sets two instance properties:
+     * - this.fontkit: The fontkit module or null
+     * - this.fontkitAvailable: Boolean flag indicating availability
+     *
+     * @returns {void}
+     *
+     * @see https://github.com/foliojs/fontkit - fontkit library
      *
      * @private
      */
@@ -51,11 +84,19 @@ class FontProcessor extends BaseProcessor {
 
     /**
      * Check if this processor can handle the given file
-     * Processes font files based on category classification
+     *
+     * Determines processing eligibility based on file category.
+     * Part of the Template Method pattern from BaseProcessor.
+     * Files are categorized as 'font' by the scanner based on
+     * extension (.ttf, .otf, .woff, .woff2) or MIME type.
      *
      * @param {Object} fileInfo - File information object
-     * @param {string} fileInfo.category - File category
-     * @returns {boolean} - True if this processor can handle the file
+     * @param {string} fileInfo.category - File category (e.g., 'font', 'image')
+     * @returns {boolean} True if file category is 'font'
+     *
+     * @example
+     * const canHandle = processor.canProcess({ category: 'font' }); // true
+     * const cannotHandle = processor.canProcess({ category: 'image' }); // false
      */
     canProcess(fileInfo) {
         return fileInfo.category === 'font';
@@ -63,11 +104,36 @@ class FontProcessor extends BaseProcessor {
 
     /**
      * Main processing method
-     * Orchestrates metadata extraction from font files
      *
-     * @param {Object} fileInfo - File information object with path, name, etc.
-     * @returns {Promise<Object>} - Enhanced file information with metadata
-     * @throws {Error} - Propagates validation and processing errors
+     * Orchestrates complete font metadata extraction pipeline.
+     * Overrides BaseProcessor.process() to implement custom processing logic.
+     *
+     * Processing flow:
+     * 1. Validate file exists and is accessible
+     * 2. Initialize metadata.font object
+     * 3. Choose extraction method based on fontkit availability:
+     *    - With fontkit: Full metadata (family, glyphs, features, coverage, etc.)
+     *    - Without fontkit: Basic metadata (format, file size, warning message)
+     * 4. Add processing metadata (timestamp, duration, warnings)
+     *
+     * Unlike other processors that use the Template Method pattern,
+     * FontProcessor overrides process() entirely for better control
+     * over fontkit availability handling.
+     *
+     * @param {Object} fileInfo - File information object
+     * @param {string} fileInfo.path - Absolute path to the font file
+     * @param {string} fileInfo.name - Filename with extension
+     * @returns {Promise<Object>} Enhanced fileInfo with metadata.font populated
+     * @throws {Error} Only throws via handleError() which catches and logs errors
+     *
+     * @example
+     * const fileInfo = {
+     *   path: '/fonts/Roboto-Regular.ttf',
+     *   name: 'Roboto-Regular.ttf',
+     *   category: 'font'
+     * };
+     * const result = await processor.process(fileInfo);
+     * // result.metadata.font contains: family, weight, glyphCount, features, etc.
      */
     async process(fileInfo) {
         const startTime = Date.now();
@@ -108,10 +174,44 @@ class FontProcessor extends BaseProcessor {
 
     /**
      * Extract comprehensive font metadata using fontkit library
-     * This method provides detailed information including glyphs, features, and variations
+     *
+     * Main extraction pipeline when fontkit is available.
+     * Parses font binary data and extracts all available metadata
+     * by calling specialized extraction methods for each aspect.
+     *
+     * Extraction pipeline:
+     * 1. Load font file into memory buffer
+     * 2. Parse with fontkit (supports TTF, OTF, WOFF, WOFF2, TTC/OTC)
+     * 3. Extract naming (family, subfamily, PostScript name, etc.)
+     * 4. Extract properties (weight, style, stretch, monospace, serif)
+     * 5. Extract glyph data (count, metrics, units per em)
+     * 6. Extract OpenType features (ligatures, alternates, etc.)
+     * 7. Extract character coverage (Unicode ranges, supported scripts)
+     * 8. Extract variations (for variable fonts with multiple axes)
+     * 9. Extract licensing (copyright, license, trademark)
      *
      * @param {Object} fileInfo - File information object
-     * @returns {Promise<void>}
+     * @param {string} fileInfo.path - Absolute path to the font file
+     * @param {string} fileInfo.name - Filename with extension
+     * @param {Object} fileInfo.metadata - Metadata container
+     * @param {Object} fileInfo.metadata.font - Font metadata object to populate
+     * @returns {Promise<void>} Resolves when extraction is complete
+     * @throws {Error} If fontkit cannot parse the file or extraction fails
+     *
+     * @see https://github.com/foliojs/fontkit#opening-a-font - fontkit API
+     *
+     * @example
+     * // After extraction, fileInfo.metadata.font contains:
+     * // {
+     * //   family: 'Roboto',
+     * //   weight: 400,
+     * //   glyphCount: 3878,
+     * //   features: [{ tag: 'liga', type: 'substitution' }, ...],
+     * //   characterSets: { hasBasicLatin: true, hasCJK: false, ... },
+     * //   languages: ['en', 'el', 'ru'],
+     * //   isVariable: false
+     * // }
+     *
      * @private
      */
     async extractFontMetadataWithFontkit(fileInfo) {
@@ -155,8 +255,40 @@ class FontProcessor extends BaseProcessor {
     /**
      * Extract font naming information (family, subfamily, full name, etc.)
      *
+     * Extracts human-readable names from the font's name table (OpenType 'name' table).
+     * These names are used for font identification and display in applications.
+     *
+     * Extracted names:
+     * - family: Font family name (e.g., 'Roboto', 'Helvetica')
+     * - subfamily: Style name (e.g., 'Regular', 'Bold', 'Italic')
+     * - fullName: Complete font name (e.g., 'Roboto Bold Italic')
+     * - postScriptName: PostScript-compatible name (no spaces, e.g., 'Roboto-BoldItalic')
+     * - manufacturer: Font foundry or creator (optional)
+     * - designer: Font designer name (optional)
+     *
      * @param {Object} fileInfo - File information object
+     * @param {Object} fileInfo.metadata - Metadata container
+     * @param {Object} fileInfo.metadata.font - Font metadata object
      * @param {Object} font - Parsed font object from fontkit
+     * @param {string} font.familyName - Font family name
+     * @param {string} font.subfamilyName - Font subfamily/style name
+     * @param {string} font.fullName - Complete font name
+     * @param {string} font.postscriptName - PostScript name
+     * @returns {void}
+     *
+     * @see https://docs.microsoft.com/en-us/typography/opentype/spec/name - OpenType name table
+     *
+     * @example
+     * // After extraction:
+     * // {
+     * //   family: 'Roboto',
+     * //   subfamily: 'Bold',
+     * //   fullName: 'Roboto Bold',
+     * //   postScriptName: 'Roboto-Bold',
+     * //   manufacturer: 'Google',
+     * //   designer: 'Christian Robertson'
+     * // }
+     *
      * @private
      */
     extractNamingInfo(fileInfo, font) {
@@ -183,8 +315,43 @@ class FontProcessor extends BaseProcessor {
     /**
      * Extract font properties (weight, style, stretch, width)
      *
+     * Extracts typographic properties from the font's OS/2 and post tables.
+     * These properties define the visual characteristics of the font.
+     *
+     * Extracted properties:
+     * - weight: Numerical weight (100-900, where 400=normal, 700=bold)
+     * - style: Text style ('normal', 'italic', 'oblique')
+     * - stretch: Width class ('normal', 'condensed', 'expanded', etc.)
+     * - width: Numeric width value (optional)
+     * - isMonospace: Whether all glyphs have equal width
+     * - hasSerifs: Whether the font has serif decorations
+     *
+     * Uses multiple extraction strategies with fallbacks:
+     * - Primary: OS/2 table values (usWeightClass, usWidthClass, etc.)
+     * - Fallback: Subfamily name parsing (e.g., "Bold Italic" → weight=700, style=italic)
+     * - Default: Standard values (weight=400, style=normal, stretch=normal)
+     *
      * @param {Object} fileInfo - File information object
+     * @param {Object} fileInfo.metadata - Metadata container
+     * @param {Object} fileInfo.metadata.font - Font metadata object
      * @param {Object} font - Parsed font object from fontkit
+     * @param {Object} font.OS2 - OS/2 table with weight/width classifications
+     * @param {Object} font.post - Post table with italic angle
+     * @returns {void}
+     *
+     * @see https://docs.microsoft.com/en-us/typography/opentype/spec/os2 - OpenType OS/2 table
+     * @see https://docs.microsoft.com/en-us/typography/opentype/spec/post - OpenType post table
+     *
+     * @example
+     * // After extraction for "Roboto Bold Italic":
+     * // {
+     * //   weight: 700,
+     * //   style: 'italic',
+     * //   stretch: 'normal',
+     * //   isMonospace: false,
+     * //   hasSerifs: false
+     * // }
+     *
      * @private
      */
     extractFontProperties(fileInfo, font) {
@@ -884,18 +1051,56 @@ class FontProcessor extends BaseProcessor {
     }
 
     /**
-     * Get supported file extensions
+     * Get list of supported file extensions
      *
-     * @returns {string[]} - Array of supported extensions
+     * Returns all font file extensions that this processor can handle.
+     * Used by the file scanner to route files to the appropriate processor.
+     *
+     * Supported formats:
+     * - TTF (TrueType Font) - Desktop font format
+     * - OTF (OpenType Font) - Advanced desktop font format
+     * - WOFF (Web Open Font Format) - Compressed web font
+     * - WOFF2 (Web Open Font Format 2) - Better compressed web font
+     *
+     * Note: TTC (TrueType Collection) and OTC (OpenType Collection) are
+     * also supported by fontkit but not included in the extension list
+     * as they're less common.
+     *
+     * @returns {string[]} Array of supported file extensions (lowercase, without dots)
+     *
+     * @example
+     * const extensions = processor.getSupportedExtensions();
+     * // ['ttf', 'otf', 'woff', 'woff2']
      */
     getSupportedExtensions() {
         return ['ttf', 'otf', 'woff', 'woff2'];
     }
 
     /**
-     * Get supported MIME types
+     * Get list of supported MIME types
      *
-     * @returns {string[]} - Array of supported MIME types
+     * Returns MIME types that this processor can handle.
+     * Used for file type detection when extension is ambiguous or missing.
+     *
+     * Includes both modern standard MIME types (font/ttf, font/woff)
+     * and legacy application/* types for broader compatibility.
+     *
+     * @returns {string[]} Array of supported MIME types
+     *
+     * @see https://www.iana.org/assignments/media-types/media-types.xhtml#font - IANA font MIME types
+     *
+     * @example
+     * const mimeTypes = processor.getSupportedMimeTypes();
+     * // [
+     * //   'font/ttf',
+     * //   'font/otf',
+     * //   'application/x-font-ttf',
+     * //   'application/x-font-opentype',
+     * //   'font/woff',
+     * //   'application/x-font-woff',
+     * //   'font/woff2',
+     * //   'application/x-font-woff2'
+     * // ]
      */
     getSupportedMimeTypes() {
         return [
