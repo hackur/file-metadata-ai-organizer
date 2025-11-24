@@ -842,6 +842,26 @@ class DatabaseManager {
                     hasAlpha: imgData.has_alpha === 1,
                     perceptualHash: imgData.perceptual_hash
                 };
+
+                // Parse dominant colors if present
+                if (imgData.dominant_colors) {
+                    try {
+                        metadata.image.dominantColors = JSON.parse(imgData.dominant_colors);
+                    } catch (error) {
+                        // Ignore malformed JSON
+                    }
+                }
+
+                // Fetch EXIF data if available
+                const exifStmt = this.db.prepare('SELECT data FROM exif_data WHERE file_id = ?');
+                const exifRow = exifStmt.get(fileId);
+                if (exifRow && exifRow.data) {
+                    try {
+                        metadata.image.exif = JSON.parse(exifRow.data);
+                    } catch (error) {
+                        // Ignore malformed JSON
+                    }
+                }
             }
         } else if (category === 'video') {
             const stmt = this.db.prepare('SELECT * FROM video_metadata WHERE file_id = ?');
